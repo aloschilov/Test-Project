@@ -1,0 +1,3 @@
+[submodule "ComputerGraphics"]
+	path = ComputerGraphics
+	url = git@github.com:aloschilov/ComputerGraphics.git
