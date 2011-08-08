@@ -91,9 +91,6 @@ void MeshViewWidget::paintGL()
     glRotatef(xRot / 16.0, 1.0, 0.0, 0.0);
     glRotatef(yRot / 16.0, 0.0, 1.0, 0.0);
     glRotatef(zRot / 16.0, 0.0, 0.0, 1.0);
-
-    //glBegin();
-    //glEnd();
 }
 
 void MeshViewWidget::resizeGL(int width, int height)
@@ -129,4 +126,39 @@ void MeshViewWidget::mouseMoveEvent(QMouseEvent *event)
         setZRotation(zRot + 8 * dx);
     }
     lastPos = event->pos();
+}
+
+bool MeshViewWidget::isExtensionSupported(char *targetExtension)
+{
+    const unsigned char *extensions = NULL;
+    const unsigned char *start;
+    unsigned char *where;
+    unsigned char *terminator;
+
+    // Extension names should not have spaces
+    where = (unsigned char*) strchr( targetExtension, ' ');
+    if ( where || *targetExtension == '\0')
+    {
+        return false;
+    }
+
+    // Get extensions string
+    extensions = glGetString( GL_EXTENSIONS );
+
+    // Search the extensions string for an exact copy
+    start = extensions;
+    while(true)
+    {
+        where = (unsigned char*) strstr( (const char*) start, targetExtension );
+        if ( !where )
+        {
+            break;
+        }
+        terminator = where + strlen( targetExtension );
+        if( where == start || *(where - 1) == ' ')
+            if( *terminator == ' ' || terminator == '\0')
+                return true;
+        start = terminator;
+    }
+    return false;
 }
