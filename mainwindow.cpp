@@ -2,25 +2,21 @@
 
 #include "mainwindow.h"
 
-#include "meshviewwidget.h"
-#include "loadmeshthread.h"
+#include "glwidget.h"
+#include "gloperationsthread.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
-
-
     setWindowTitle("3D cloud crop");
 
-    MeshViewWidget *meshViewWidget = new MeshViewWidget();
-    setCentralWidget(meshViewWidget);
-
-
-    // Create thread that will load mesh file
-    loadMeshThread = new LoadMeshThread(meshViewWidget, this);
+    GLWidget *glWidget = new GLWidget();
+    setCentralWidget(glWidget);
 
     createActions();
     createMenu();
+
+    connect(this, SIGNAL(gotFileNameToLoad(QString)),glWidget->getGLOperationThread(),SLOT(loadMesh(QString)));
 }
 
 MainWindow::~MainWindow()
@@ -34,7 +30,7 @@ void MainWindow::openMeshFile()
                                             tr("Open obj file to crop"),
                                             "",
                                             tr("Wavefrom OBJ(*.obj)"));
-    loadMeshThread->loadMesh(fileName);
+    emit gotFileNameToLoad(fileName);
 }
 
 void MainWindow::createActions()

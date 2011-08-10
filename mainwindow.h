@@ -1,9 +1,8 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include <QtGui/QMainWindow>
+#include <QtGui>
 
-class LoadMeshThread;
 
 class MainWindow : public QMainWindow
 {
@@ -13,6 +12,9 @@ public:
     MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
+signals:
+    void gotFileNameToLoad(QString filename);
+
 private slots:
     void openMeshFile();
 
@@ -21,8 +23,6 @@ private:
     void createMenu();
 
     QAction *openMeshFileAction;
-
-    LoadMeshThread *loadMeshThread;
 };
 
 #endif // MAINWINDOW_H

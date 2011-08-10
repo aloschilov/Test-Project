@@ -14,15 +14,15 @@ RESOURCES = 3d_cloud_crop.qrc
 
 SOURCES += main.cpp\
         mainwindow.cpp \
-    meshviewwidget.cpp \
-    loadmeshthread.cpp \
     ComputerGraphics/matrix.cpp \
     ComputerGraphics/linalg.cpp \
-    glextensions.cpp
+    glextensions.cpp \
+    gloperationsthread.cpp \
+    glwidget.cpp
 
 HEADERS  += mainwindow.h \
-    meshviewwidget.h \
-    loadmeshthread.h \
     ComputerGraphics/matrix.h \
     ComputerGraphics/linalg.h \
-    glextensions.h
+    glextensions.h \
+    gloperationsthread.h \
+    glwidget.h
