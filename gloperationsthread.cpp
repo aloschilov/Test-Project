@@ -9,6 +9,7 @@
 
 #include "gloperationsthread.h"
 #include "glwidget.h"
+#include "glextensions.h"
 
 #include "ComputerGraphics/matrix.h"
 #include "ComputerGraphics/linalg.h"
@@ -26,148 +27,168 @@ double string_to_double( const std::string& s ) {
         return x;
 }
 
-template <class T>
-T* vector_to_pointer(vector<T> &v)
-{
-    typename vector<T>::iterator it;
-
-    T* p = v.empty() ? NULL : &v[0] + (it - v.begin());
-    return p;
-}
-
 GLOperationThread::GLOperationThread(GLWidget *_glw) :
-    QThread(), glw(_glw)
+    QThread(), glw(_glw), xRot(0), yRot(0), zRot(0), doRendering(false)
 {
+    qDebug() << ">>> GLOperationThread::GLOperationThread()";
     this->moveToThread(this);
+    loadedVerticesVboId = 0;
+    qDebug() << "<<< GLOperationThread::GLOperationThread()";
 }
 
 void GLOperationThread::loadMesh(QString fileName)
 {
+    qDebug() << ">>> void GLOperationThread::loadMesh(QString fileName)";
+    QMutexLocker lock(&glmutex);
     ifstream in(fileName.toStdString().c_str(), ios::in);
     string current_token;
 
     while(!in.eof()) {
+        in >> current_token;
+        if (current_token == string("v")) {
+            double first_coordinate;
+            double second_coordinate;
+            double third_coordinate;
+
             in >> current_token;
-            if (current_token == string("v")) {
-                    double first_coordinate;
-                    double second_coordinate;
-                    double third_coordinate;
+            first_coordinate = string_to_double(current_token);
+            in >> current_token;
+            second_coordinate = string_to_double(current_token);
+            in >> current_token;
+            third_coordinate = string_to_double(current_token);
 
-                    in >> current_token;
-                    first_coordinate = string_to_double(current_token);
-                    in >> current_token;
-                    second_coordinate = string_to_double(current_token);
-                    in >> current_token;
-                    third_coordinate = string_to_double(current_token);
-
-                    loadedVerticesCoordinates.push_back(first_coordinate);
-                    loadedVerticesCoordinates.push_back(second_coordinate);
-                    loadedVerticesCoordinates.push_back(third_coordinate);
-            }
+            loadedVerticesCoordinates.push_back(first_coordinate);
+            loadedVerticesCoordinates.push_back(second_coordinate);
+            loadedVerticesCoordinates.push_back(third_coordinate);
+        }
     }
 
-    qDebug() << "Number of vertices:" << loadedVerticesCoordinates.size();
     in.close();
+
+    GLfloat *to_send = new GLfloat[loadedVerticesCoordinates.size()];
+
+    for(int i=0; i<loadedVerticesCoordinates.size();++i) {
+        to_send[i] = loadedVerticesCoordinates[i];
+    }
+
+
+    loadedNumberOfVertices = loadedVerticesCoordinates.size()/3;
+
+    glGenBuffers(1, &loadedVerticesVboId);
+    glBindBuffer(GL_ARRAY_BUFFER, loadedVerticesVboId);
+    glBufferData(GL_ARRAY_BUFFER,
+                 loadedVerticesCoordinates.size()*sizeof(GLfloat),
+                 to_send,
+                 GL_STATIC_DRAW );
+
+    delete to_send;
+
+    qDebug() << "<<< void GLOperationThread::loadMesh(QString fileName)";
 }
 
 void GLOperationThread::resizeViewport(const QSize &size)
 {
-    qDebug() << "resizeViewport()";
-    w = size.width();
-    h = size.height();
-    glViewport(0, 0, w, h);
+    qDebug() << ">>> void GLOperationThread::resizeViewport(const QSize &size)";
+
+    if (doRendering)
+    {
+        int width = size.width();
+        int height = size.height();
+        int side = qMin(width, height);
+
+        qDebug() << "glViewport with";
+        qDebug() << "side: " << side;
+        qDebug() << "width: " << width;
+        qDebug() << "height: " << height;
+
+        glViewport((width - side) / 2, (height - side) / 2, side, side);
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        //glOrtho(-0.5, +0.5, -0.5, +0.5, 4.0, 15.0);
+        glMatrixMode(GL_MODELVIEW);
+    }
+
+    qDebug() << "<<< void GLOperationThread::resizeViewport(const QSize &size)";
 }
 
 void GLOperationThread::render()
 {
-//    if(!doRendering)
-//        return;
-    qDebug() << "Trying to render";
+    qDebug() << ">>> void GLOperationThread::render()";
+    QMutexLocker lock(&glmutex);
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear The Screen And The Depth Buffer
-    glLoadIdentity();                   // Reset The View
-    glTranslatef(-1.5f,0.0f,-6.0f);             // Move Into The Screen And Left
-    glRotatef(10,0.0f,1.0f,0.0f);             // Rotate The Triangle On The Y axis ( NEW )
+    if(doRendering == false)
+        return;
 
-    glBegin(GL_TRIANGLES);                  // Start Drawing A Triangle
-        glColor3f(1.0f,0.0f,0.0f);          // Set Top Point Of Triangle To Red
-        glVertex3f( 0.0f, 1.0f, 0.0f);          // First Point Of The Triangle
-        glColor3f(0.0f,1.0f,0.0f);          // Set Left Point Of Triangle To Green
-        glVertex3f(-1.0f,-1.0f, 0.0f);          // Second Point Of The Triangle
-        glColor3f(0.0f,0.0f,1.0f);          // Set Right Point Of Triangle To Blue
-        glVertex3f( 1.0f,-1.0f, 0.0f);          // Third Point Of The Triangle
-    glEnd();                        // Done Drawing The Triangle
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glLoadIdentity();
+
+    glScalef(0.01,0.01,0.01);
+
+    if (loadedVerticesCoordinates.size() != 0 )
+    {
+        qDebug() << "   >>> if (loadedVerticesCoordinates.size() != 0 )";
+
+        glColor3f(1.0f,1.0f,1.0f);
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glBindBuffer( GL_ARRAY_BUFFER, loadedVerticesVboId );
+        glVertexPointer( 3, GL_FLOAT, 0,  0);
+        glDrawArrays( GL_POINTS , 0, loadedVerticesCoordinates.size()/3);
+        glDisableClientState(GL_VERTEX_ARRAY);
+        qDebug() << "   <<< if (loadedVerticesCoordinates.size() != 0 )";
+    }
 
     glw->swapBuffers();
+    qDebug() << "<<< void GLOperationThread::render()";
 }
 
 void GLOperationThread::run()
 {
-    qDebug() << "void GLOperationThread::run() glw->makeCurrent();";
+    qDebug() << ">>> void GLOperationThread::run()";
     glw->makeCurrent();
 
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(-5.0, 5.0, -5.0, 5.0, 1.0, 100.0);
-    glMatrixMode(GL_MODELVIEW);
-    glViewport(0, 0, 200, 200);
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-    glShadeModel(GL_SMOOTH);
+    glmutex.lock();
+
+
+    if (!getGLExtensionFunctions().resolve(glw->context()))
+    {
+        qDebug() << "Failed to resolve OpenGL functions required";
+        return;
+    }
+
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glShadeModel(GL_SMOOTH);
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_MULTISAMPLE);
+    static GLfloat lightPosition[4] = { 0.5, 5.0, 7.0, 1.0 };
+    glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+
+    doRendering = true;
+    resizeViewport(glw->geometry().size());
+    glmutex.unlock();
 
     exec();
     glw->doneCurrent();
 
-//    GLuint verticesVboId;
-
-//    glGenBuffers(1, &verticesVboId);
-
-//    qDebug() << "glGenBuffersARB" << glGenBuffersARB;
-//    glGenBuffersARB( 1, &verticesVboId );
-//    qDebug() << "glGenBuffersARB( 1, &verticesVboId );";
-
-//    glBindBufferARB( GL_ARRAY_BUFFER_ARB, verticesVboId );
-//    qDebug() << "glBindBufferARB( GL_ARRAY_BUFFER_ARB, verticesVboId );";
-
-//    glBufferDataARB( GL_ARRAY_BUFFER_ARB,
-//                     loadedVerticesCoordinates.size()*3*sizeof(GLfloat),
-//                     vector_to_pointer(loadedVerticesCoordinates),
-//                     GL_STATIC_DRAW_ARB );
-//    qDebug() << "glBufferDataARB";
+    qDebug() << "<<< void GLOperationThread::run()";
 }
 
 
-bool GLOperationThread::isExtensionSupported(char *targetExtension)
+void GLOperationThread::setXRotation(int angle)
 {
-    const unsigned char *extensions = NULL;
-    const unsigned char *start;
-    unsigned char *where;
-    unsigned char *terminator;
+    xRot = angle;
+    render();
+}
 
-    // Extension names should not have spaces
-    where = (unsigned char*) strchr( targetExtension, ' ');
-    if ( where || *targetExtension == '\0')
-    {
-        return false;
-    }
+void GLOperationThread::setYRotation(int angle)
+{
+    yRot = angle;
+    render();
+}
 
-    // Get extensions string
-    extensions = glGetString( GL_EXTENSIONS );
-
-    // Search the extensions string for an exact copy
-    start = extensions;
-    while(true)
-    {
-        where = (unsigned char*) strstr( (const char*) start, targetExtension );
-        if ( !where )
-        {
-            break;
-        }
-        terminator = where + strlen( targetExtension );
-        if( where == start || *(where - 1) == ' ')
-            if( *terminator == ' ' || terminator == '\0')
-                return true;
-        start = terminator;
-    }
-    return false;
+void GLOperationThread::setZRotation(int angle)
+{
+    zRot = angle;
+    render();
 }
