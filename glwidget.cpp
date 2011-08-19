@@ -18,6 +18,10 @@ GLWidget::GLWidget(QWidget *parent) :
 
     connect(this, SIGNAL(paintRequested()), glt, SLOT(render()));
     connect(this, SIGNAL(resizeRequested(QSize)), glt, SLOT(resizeViewport(QSize)));
+
+    connect(this, SIGNAL(xRotationChanged(int)), glt, SLOT(setXRotation(int)));
+    connect(this, SIGNAL(yRotationChanged(int)), glt, SLOT(setYRotation(int)));
+    connect(this, SIGNAL(zRotationChanged(int)), glt, SLOT(setZRotation(int)));
 }
 
 GLWidget::~GLWidget()

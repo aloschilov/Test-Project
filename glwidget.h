@@ -23,7 +23,6 @@ signals:
     void xRotationChanged(int angle);
     void yRotationChanged(int angle);
     void zRotationChanged(int angle);
-
     void paintRequested();
     void resizeRequested(QSize);
 
