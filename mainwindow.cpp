@@ -4,6 +4,7 @@
 
 #include "glwidget.h"
 #include "gloperationsthread.h"
+#include "scaleselectionwidget.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -13,10 +14,22 @@ MainWindow::MainWindow(QWidget *parent)
     GLWidget *glWidget = new GLWidget();
     setCentralWidget(glWidget);
 
+
+    scaleSelectionWidget = new ScaleSelectionWidget();
+
+    scaleSelectionDockWidget = new QDockWidget("Color map", this);
+    scaleSelectionDockWidget->setWidget(scaleSelectionWidget);
+    scaleSelectionDockWidget->setAllowedAreas(Qt::RightDockWidgetArea | Qt::LeftDockWidgetArea);
+    scaleSelectionDockWidget->setVisible(true);
+
+    addDockWidget(Qt::RightDockWidgetArea, scaleSelectionDockWidget, Qt::Horizontal);
+
     createActions();
     createMenu();
 
     connect(this, SIGNAL(gotFileNameToLoad(QString)),glWidget->getGLOperationThread(),SLOT(loadMesh(QString)));
+    connect(scaleSelectionWidget, SIGNAL(scaleChanged(Scale*)),
+            glWidget->getGLOperationThread(),SLOT(setScale(Scale*)));
 }
 
 MainWindow::~MainWindow()
@@ -46,4 +59,7 @@ void MainWindow::createMenu()
     QMenuBar *menubar = menuBar();
     QMenu *file = menubar->addMenu("&File");
     file->addAction(openMeshFileAction);
+
+    QMenu *view = menubar->addMenu("&View");
+    view->addAction(scaleSelectionDockWidget->toggleViewAction());
 }

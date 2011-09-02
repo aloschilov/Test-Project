@@ -18,11 +18,19 @@ SOURCES += main.cpp\
     ComputerGraphics/linalg.cpp \
     glextensions.cpp \
     gloperationsthread.cpp \
-    glwidget.cpp
+    glwidget.cpp \
+    scale.cpp \
+    scalewidget.cpp \
+    colormapradiobutton.cpp \
+    scaleselectionwidget.cpp
 
 HEADERS  += mainwindow.h \
     ComputerGraphics/matrix.h \
     ComputerGraphics/linalg.h \
     glextensions.h \
     gloperationsthread.h \
-    glwidget.h
+    glwidget.h \
+    scale.h \
+    scalewidget.h \
+    colormapradiobutton.h \
+    scaleselectionwidget.h

@@ -15,13 +15,6 @@ GLWidget::GLWidget(QWidget *parent) :
     zRot = 0;
 
     setAutoBufferSwap(false);
-
-    connect(this, SIGNAL(paintRequested()), glt, SLOT(render()));
-    connect(this, SIGNAL(resizeRequested(QSize)), glt, SLOT(resizeViewport(QSize)));
-
-    connect(this, SIGNAL(xRotationChanged(int)), glt, SLOT(setXRotation(int)));
-    connect(this, SIGNAL(yRotationChanged(int)), glt, SLOT(setYRotation(int)));
-    connect(this, SIGNAL(zRotationChanged(int)), glt, SLOT(setZRotation(int)));
 }
 
 GLWidget::~GLWidget()
@@ -39,6 +32,12 @@ void GLWidget::showEvent ( QShowEvent * event )
     if (glt->isRunning() == false)
     {
         glt->start();
+        connect(this, SIGNAL(paintRequested()), glt, SLOT(render()), Qt::BlockingQueuedConnection);
+        connect(this, SIGNAL(resizeRequested(QSize)), glt, SLOT(resizeViewport(QSize)), Qt::BlockingQueuedConnection);
+
+        connect(this, SIGNAL(xRotationChanged(int)), glt, SLOT(setXRotation(int)), Qt::BlockingQueuedConnection);
+        connect(this, SIGNAL(yRotationChanged(int)), glt, SLOT(setYRotation(int)), Qt::BlockingQueuedConnection);
+        connect(this, SIGNAL(zRotationChanged(int)), glt, SLOT(setZRotation(int)), Qt::BlockingQueuedConnection);
     }
 }
 
@@ -54,12 +53,10 @@ void GLWidget::paintEvent(QPaintEvent *)
 
 void GLWidget::closeEvent(QCloseEvent *evt)
 {
-    qDebug() << ">>> void GLWidget::closeEvent(QCloseEvent *evt)";
     glt->quit();
     glt->wait();
     delete glt;
     GLWidget::closeEvent(evt);
-    qDebug() << "<<< void GLWidget::closeEvent(QCloseEvent *evt)";
 }
 
 void GLWidget::mousePressEvent(QMouseEvent *event)
@@ -73,11 +70,11 @@ void GLWidget::mouseMoveEvent(QMouseEvent *event)
     int dy = event->y() - lastPos.y();
 
     if (event->buttons() & Qt::LeftButton) {
-        setXRotation(xRot + 8 * dy);
-        setYRotation(yRot + 8 * dx);
+        setXRotation(xRot + 3 * dy);
+        setYRotation(yRot + 3 * dx);
     } else if (event->buttons() & Qt::RightButton) {
-        setXRotation(xRot + 8 * dy);
-        setZRotation(zRot + 8 * dx);
+        setXRotation(xRot + 3 * dy);
+        setZRotation(zRot + 3 * dx);
     }
     lastPos = event->pos();
 }

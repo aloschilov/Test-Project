@@ -1,15 +1,14 @@
-#include <QDebug>
-
-
 #include <iostream>
 #include <vector>
 #include <string>
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 
 #include "gloperationsthread.h"
 #include "glwidget.h"
 #include "glextensions.h"
+#include "scale.h"
 
 #include "ComputerGraphics/matrix.h"
 #include "ComputerGraphics/linalg.h"
@@ -30,16 +29,14 @@ double string_to_double( const std::string& s ) {
 GLOperationThread::GLOperationThread(GLWidget *_glw) :
     QThread(), glw(_glw), xRot(0), yRot(0), zRot(0), doRendering(false)
 {
-    qDebug() << ">>> GLOperationThread::GLOperationThread()";
     this->moveToThread(this);
     loadedVerticesVboId = 0;
-    qDebug() << "<<< GLOperationThread::GLOperationThread()";
+    loadedVerticesColorVboId = 0;
+    applyScale = false;
 }
 
 void GLOperationThread::loadMesh(QString fileName)
 {
-    qDebug() << ">>> void GLOperationThread::loadMesh(QString fileName)";
-    QMutexLocker lock(&glmutex);
     ifstream in(fileName.toStdString().c_str(), ios::in);
     string current_token;
 
@@ -72,8 +69,6 @@ void GLOperationThread::loadMesh(QString fileName)
     }
 
 
-    loadedNumberOfVertices = loadedVerticesCoordinates.size()/3;
-
     glGenBuffers(1, &loadedVerticesVboId);
     glBindBuffer(GL_ARRAY_BUFFER, loadedVerticesVboId);
     glBufferData(GL_ARRAY_BUFFER,
@@ -82,24 +77,15 @@ void GLOperationThread::loadMesh(QString fileName)
                  GL_STATIC_DRAW );
 
     delete to_send;
-
-    qDebug() << "<<< void GLOperationThread::loadMesh(QString fileName)";
 }
 
 void GLOperationThread::resizeViewport(const QSize &size)
 {
-    qDebug() << ">>> void GLOperationThread::resizeViewport(const QSize &size)";
-
     if (doRendering)
     {
         int width = size.width();
         int height = size.height();
         int side = qMin(width, height);
-
-        qDebug() << "glViewport with";
-        qDebug() << "side: " << side;
-        qDebug() << "width: " << width;
-        qDebug() << "height: " << height;
 
         glViewport((width - side) / 2, (height - side) / 2, side, side);
         glMatrixMode(GL_PROJECTION);
@@ -107,14 +93,10 @@ void GLOperationThread::resizeViewport(const QSize &size)
         //glOrtho(-0.5, +0.5, -0.5, +0.5, 4.0, 15.0);
         glMatrixMode(GL_MODELVIEW);
     }
-
-    qDebug() << "<<< void GLOperationThread::resizeViewport(const QSize &size)";
 }
 
 void GLOperationThread::render()
 {
-    qDebug() << ">>> void GLOperationThread::render()";
-    QMutexLocker lock(&glmutex);
 
     if(doRendering == false)
         return;
@@ -130,32 +112,42 @@ void GLOperationThread::render()
 
     if (loadedVerticesCoordinates.size() != 0 )
     {
-        qDebug() << "   >>> if (loadedVerticesCoordinates.size() != 0 )";
-
         glColor3f(1.0f,1.0f,1.0f);
         glEnableClientState(GL_VERTEX_ARRAY);
+
+        if (applyScale)
+        {
+            glEnableClientState(GL_COLOR_ARRAY);
+        }
+
         glBindBuffer( GL_ARRAY_BUFFER, loadedVerticesVboId );
-        glVertexPointer( 3, GL_FLOAT, 0,  0);
+        glVertexPointer( 3, GL_FLOAT, 0, 0);
+
+        if (applyScale)
+        {
+            glBindBuffer( GL_ARRAY_BUFFER, loadedVerticesColorVboId);
+            glColorPointer( 4, GL_FLOAT, 0, 0);
+        }
+
         glDrawArrays( GL_POINTS , 0, loadedVerticesCoordinates.size()/3);
+
+        if (applyScale)
+        {
+            glDisableClientState(GL_COLOR_ARRAY);
+        }
+
         glDisableClientState(GL_VERTEX_ARRAY);
-        qDebug() << "   <<< if (loadedVerticesCoordinates.size() != 0 )";
     }
 
     glw->swapBuffers();
-    qDebug() << "<<< void GLOperationThread::render()";
 }
 
 void GLOperationThread::run()
 {
-    qDebug() << ">>> void GLOperationThread::run()";
     glw->makeCurrent();
-
-    glmutex.lock();
-
 
     if (!getGLExtensionFunctions().resolve(glw->context()))
     {
-        qDebug() << "Failed to resolve OpenGL functions required";
         return;
     }
 
@@ -165,12 +157,9 @@ void GLOperationThread::run()
 
     doRendering = true;
     resizeViewport(glw->geometry().size());
-    glmutex.unlock();
 
     exec();
     glw->doneCurrent();
-
-    qDebug() << "<<< void GLOperationThread::run()";
 }
 
 
@@ -189,5 +178,74 @@ void GLOperationThread::setYRotation(int angle)
 void GLOperationThread::setZRotation(int angle)
 {
     zRot = angle;
+    render();
+}
+
+static inline void qSetColor(GLfloat colorVec[], QColor c)
+{
+    colorVec[0] = c.redF();
+    colorVec[1] = c.greenF();
+    colorVec[2] = c.blueF();
+    colorVec[3] = c.alphaF();
+}
+
+void GLOperationThread::setScale(Scale *scale)
+{
+    if (loadedVerticesCoordinates.size() == 0 )
+        return;
+
+    if (applyScale)
+    {
+        glDeleteBuffers(1, &loadedVerticesColorVboId);
+    }
+
+    GLuint numberOfColorComponents = (loadedVerticesCoordinates.size()/3)*4;
+    GLuint numberOfVerticesComponents = loadedVerticesCoordinates.size()/3;
+
+    // Adjusting scale to points array
+
+    GLfloat maxZ;
+    int i = 0;
+    maxZ = loadedVerticesCoordinates[i*3+2];
+    do {
+        ++i;
+        if (maxZ < loadedVerticesCoordinates[i*3+2])
+        {
+            maxZ = loadedVerticesCoordinates[i*3+2];
+        }
+    } while(i<numberOfVerticesComponents);
+
+    GLfloat minZ;
+    minZ = loadedVerticesCoordinates[i*3+2];
+    do {
+        ++i;
+        if (minZ < loadedVerticesCoordinates[i*3+2])
+        {
+            minZ = loadedVerticesCoordinates[i*3+2];
+        }
+    } while(i<numberOfVerticesComponents);
+
+    scale->setMaxValue(maxZ);
+    scale->setMinValue(minZ);
+
+    GLfloat *to_send = new GLfloat[numberOfColorComponents];
+
+    for(int i=0; i<numberOfVerticesComponents;++i)
+    {
+        QColor color;
+        color.setRgba(scale->getColor(loadedVerticesCoordinates[i*3+2]));
+        qSetColor(&to_send[i*4],color);
+    }
+
+    glGenBuffers(1, &loadedVerticesColorVboId);
+    glBindBuffer(GL_ARRAY_BUFFER, loadedVerticesColorVboId);
+    glBufferData(GL_ARRAY_BUFFER,
+                 numberOfColorComponents*sizeof(GLfloat),
+                 to_send,
+                 GL_STATIC_DRAW );
+
+    delete to_send;
+
+    applyScale = true;
     render();
 }

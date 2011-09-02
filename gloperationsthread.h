@@ -6,6 +6,7 @@
 #include <vector>
 
 class GLWidget;
+class Scale;
 
 class GLOperationThread : public QThread
 {
@@ -20,11 +21,13 @@ signals:
 public slots:
     void loadMesh(QString fileName);
     void resizeViewport(const QSize &size);
+
     void render();
 
     void setXRotation(int angle);
     void setYRotation(int angle);
     void setZRotation(int angle);
+    void setScale(Scale *scale);
 
 protected:
     void run();
@@ -33,17 +36,20 @@ private:
     QString fileName;
     GLWidget *glw;
 
+    Scale *scale;
+
     bool doRendering;
+    bool applyScale;
+
     int w;
     int h;
     int rotAngle;
 
     std::vector<GLfloat> loadedVerticesCoordinates;
     std::vector<GLfloat> croppedVecticesCoordinates;
-    GLuint loadedVerticesVboId;
-    QMutex glmutex;
 
-    size_t loadedNumberOfVertices;
+    GLuint loadedVerticesVboId;
+    GLuint loadedVerticesColorVboId;
 
     GLfloat midX;
     GLfloat midY;

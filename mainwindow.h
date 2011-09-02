@@ -3,6 +3,8 @@
 
 #include <QtGui>
 
+class ScaleSelectionWidget;
+
 
 class MainWindow : public QMainWindow
 {
@@ -23,6 +25,8 @@ private:
     void createMenu();
 
     QAction *openMeshFileAction;
+    ScaleSelectionWidget *scaleSelectionWidget;
+    QDockWidget *scaleSelectionDockWidget;
 };
 
 #endif // MAINWINDOW_H
